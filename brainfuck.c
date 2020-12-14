@@ -165,20 +165,15 @@ print_state(struct BrainVM *vm)
 }
 
 char *
-read_code_from_file(const char *file_name)
+read_code_from_file(FILE *fp, int mode)
 {
-  FILE *fp;
-  fp = fopen(file_name, "r");
-  if (fp == NULL) {
-    perror("Error in opening file");
-    exit(1);
-  }
-  
   int ch;
   size_t code_length = 0, buffer_size = BUFFER_SIZE;
   char *code = malloc(sizeof(char) * buffer_size);
   
   while ((ch = fgetc(fp)) != EOF) {
+    if (ch == '\n' && mode) break;
+    
     switch (ch) {
       case '#': {
         do { // ignore anything after '#'
@@ -205,7 +200,6 @@ read_code_from_file(const char *file_name)
   }
   code[code_length] = '\0';
   
-  fclose(fp);
   return code;
 }
 
@@ -216,16 +210,34 @@ main(int argc, char *argv[])
   opterr = 0;
   
   int debug = 0;
+  int read_file = 0;
+  const char *file_name;
   
-  while ((opt = getopt(argc, argv, "d::")) != -1) {
+  while ((opt = getopt(argc, argv, "df:")) != -1) {
     switch (opt) {
       case 'd': {
         debug = 1;
       } break;
+      case 'f': {
+        read_file = 1;
+        file_name = optarg;
+      } break;
     }
   }
   
-  const char *code = read_code_from_file("program/hello_world.brain");
+  const char *code;
+  if (read_file) {
+    FILE *fp;
+    fp = fopen(file_name, "r");
+    if (fp == NULL) {
+      fprintf(stderr, "Error in opening file: %s", file_name);
+      exit(1);
+    }
+    code = read_code_from_file(fp, 0);
+    fclose(fp);
+  } else {
+    code = read_code_from_file(stdin, 1);
+  }
   
   struct BrainVM vm = create(code);
   int run = 1;
