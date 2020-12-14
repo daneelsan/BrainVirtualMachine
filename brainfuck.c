@@ -11,13 +11,6 @@
 #define MEMORY_SIZE   30000
 #define BUFFER_SIZE    1024
 
-/*
-struct BrainProgram {
-  size_t length;
-  char   *code;
-};
-*/
-
 struct BrainVM {
   u8   memory[MEMORY_SIZE];
   u16  data_pointer;
@@ -156,7 +149,7 @@ print_state(struct BrainVM *vm)
       i = -1;
     } else if (i > MEMORY_SIZE) {
       fprintf(stderr, " ");
-    } else if (i == ip) {
+    } else if (i == dp) {
       fprintf(stderr, "{%d}", vm->memory[i]);
     } else {
       fprintf(stderr, "[%d]", vm->memory[i]);
@@ -199,7 +192,7 @@ read_code_from_file(const char *file_name)
         code[code_length++] = ch;
       } break;
     }
-    // https://stackoverflow.com/questions/38621938/using-fgetc-for-reading-into-an-array-in-c
+    
     if (code_length == BUFFER_SIZE) { // need more space
       void *tmp = realloc(code, code_length + BUFFER_SIZE);
       if (!tmp) { // realloc might fail
@@ -219,16 +212,13 @@ read_code_from_file(const char *file_name)
 int
 main(int argc, char *argv[])
 {
-  (void) argc;
-  (void) argv;
-  
-  int c;
+  int opt;
   opterr = 0;
   
   int debug = 0;
   
-  while ((c = getopt(argc, argv, "d:")) != -1) {
-    switch (c) {
+  while ((opt = getopt(argc, argv, "d::")) != -1) {
+    switch (opt) {
       case 'd': {
         debug = 1;
       } break;
@@ -238,7 +228,6 @@ main(int argc, char *argv[])
   const char *code = read_code_from_file("program/hello_world.brain");
   
   struct BrainVM vm = create(code);
-  
   int run = 1;
   while (run) {
     if (vm.instruction_pointer >= vm.code_length) break;
