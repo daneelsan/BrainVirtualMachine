@@ -4,8 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#define  u8  uint8_t
-#define u16 uint16_t
+typedef uint8_t   u8;
+typedef uint16_t u16;
 
 //#define MAX_CODE_SIZE 65536;
 #define MEMORY_SIZE   30000
@@ -71,6 +71,7 @@ step(struct BrainVM *vm)
     } break;
     case '<': {
       vm->data_pointer--;
+      // @TODO: validate underflow?
     } break;
     case '+': {
       vm->memory[vm->data_pointer]++;
@@ -110,6 +111,7 @@ step(struct BrainVM *vm)
       char ch = fgetc(stdin);
       vm->input = ch;
       vm->memory[vm->data_pointer] = (u8)ch;
+      fgetc(stdin); // consume \n
     } break;
     case '.': {
       char ch = (u8)vm->memory[vm->data_pointer];
@@ -174,16 +176,15 @@ read_code_from_file(FILE *fp, int mode)
   while ((ch = fgetc(fp)) != EOF) {
     if (ch == '\n' && mode) break;
     
-    switch (ch) {
-      case '#': {
-        do { // ignore anything after '#'
-          ch = fgetc(fp);
-        } while (ch != '\n' && ch != EOF);
-      } break;
-      case '\n':
-      case ' ': { // ignore white spaces to avoid large code size
-      } break;
-      default: { // an alternative is to only accept the 8 instructions
+    switch (ch) { // Only read the 8 instructions
+      case '+':
+      case '-':
+      case '<':
+      case '>':
+      case '[':
+      case ']':
+      case '.':
+      case ',': {
         code[code_length++] = ch;
       } break;
     }
@@ -209,12 +210,16 @@ main(int argc, char *argv[])
   int opt;
   opterr = 0;
   
+  int print = 0;
   int debug = 0;
   int read_file = 0;
   const char *file_name;
   
-  while ((opt = getopt(argc, argv, "df:")) != -1) {
+  while ((opt = getopt(argc, argv, "dpf:")) != -1) {
     switch (opt) {
+      case 'p': {
+        print = 1;
+      } break;
       case 'd': {
         debug = 1;
       } break;
@@ -236,15 +241,33 @@ main(int argc, char *argv[])
     code = read_code_from_file(fp, 0);
     fclose(fp);
   } else {
+    printf("Enter program:\n");
     code = read_code_from_file(stdin, 1);
   }
   
   struct BrainVM vm = create(code);
   int run = 1;
-  while (run) {
-    if (vm.instruction_pointer >= vm.code_length) break;
-    if (debug) { print_state(&vm); }
-    run = step(&vm);
+  
+  if (debug) {
+    int ch;
+    while (run) {
+      if (vm.instruction_pointer >= vm.code_length) break;
+      
+      run = step(&vm);
+      if (print) { print_state(&vm); }
+      
+      printf("Press 'c' to continue: ");
+      while ((ch = fgetc(stdin)) != '\n') { // @TODO: best way to ignore newline?
+        if (ch != 'c') { run = 0; }
+      }
+    }
+  } else {
+    while (run) {
+      if (vm.instruction_pointer >= vm.code_length) break;
+      
+      run = step(&vm);
+      if (print) { print_state(&vm); }
+    }
   }
   destroy(&vm);
   
